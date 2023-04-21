@@ -17,6 +17,21 @@ logLast() {
     echo -e "$1" | tee -a "$log_tmp_file"
 }
 
+runLogRotate() {
+    # check correct path of log files
+    cur_backup_log_path=`cat ./tools/logrotate.conf | grep 'backup\.log'`
+    if [[ -z ${cur_backup_log_path} || ! -f ${cur_backup_log_path} ]]; then
+        base_path=`dirname $(readlink -f $0)`
+        base_path_backup_log=${base_path}"/logs/backup.log"
+        base_path_snapshots_log=${base_path}"/logs/snapshots.log"
+        sed -i "s|.*backup\.log.*|${base_path_backup_log}|" ./tools/logrotate.conf
+        sed -i "s|.*snapshots\.log.*|${base_path_snapshots_log}|" ./tools/logrotate.conf
+        logLast "log file paths in logrotate.conf were updated."
+    fi
+    # force logrotate if not empty
+    logrotate -f ./tools/logrotate.conf
+}
+
 logStart() {
     logLast ">>>>>>>>>> BACKUP STARTED: at $(date +"%Y-%m-%d %H:%M:%S") <<<<<<<<<<"
 }
@@ -56,21 +71,6 @@ sourceConfigOrCreateIfMissing() {
         logLast "Please check that this is a valid target file. Required variables are not set correct."
         exit 1
     fi
-}
-
-runLogRotate() {
-    # check correct path of log files
-    cur_backup_log_path=`cat ../tools/logrotate.conf | grep 'backup\.log'`
-    if [ ! -f ${cur_backup_log_path} ]; then
-        base_path=`dirname $(readlink -f $0)`
-        base_path_backup_log=${base_path}"/backup.log"
-        base_path_snapshots_log=${base_path}"/snapshots.log"
-        sed -i 's/.*backup\.log.*/${base_path_backup_log}/' ./tools/logrotate.conf
-        sed -i 's/.*snapshots\.log.*/${base_path_snapshots_log}/' ./tools/logrotate.conf
-    fi
-
-    # force logrotate if not empty
-    logrotate -f ./tools/logrotate.conf
 }
 
 healthcheck() {
@@ -186,10 +186,10 @@ if [ $# -ne 1 ]; then
     exit 1
 fi
 
+runLogRotate
 logStart
 checkResticInstalled
 sourceConfigOrCreateIfMissing $1
-runLogRotate
 healthcheck /start
 resticSelfUpdate
 getSnapshotsOrInit before
