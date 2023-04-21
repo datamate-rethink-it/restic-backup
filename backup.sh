@@ -5,6 +5,10 @@ if [ ! -f "${log_tmp_file}" ]; then
     touch ${log_tmp_file}
 fi
 
+if [ ! -f ./tools/logrotate.conf ]; then
+    cp ./tools/logrotate.template ./tools/logrotate.conf
+fi
+
 ########################
 # Functions
 ########################
