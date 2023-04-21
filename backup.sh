@@ -1,5 +1,6 @@
 #!/bin/bash
 set -uo pipefail
+
 log_tmp_file=./logs/backup.log
 if [ ! -f "${log_tmp_file}" ]; then
     touch ${log_tmp_file}
