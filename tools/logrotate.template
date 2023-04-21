@@ -1,4 +1,4 @@
-# don't change this structure!
+# don't change this template
 /opt/restic-backup/logs/backup.log
 /opt/restic-backup/logs/snapshots.log
 {

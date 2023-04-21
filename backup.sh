@@ -1,13 +1,20 @@
 #!/bin/bash
 set -uo pipefail
 
-log_tmp_file=./logs/backup.log
+base_path=`dirname $(readlink -f $0)`
+log_tmp_file=${base_path}/logs/backup.log
+
+
 if [ ! -f "${log_tmp_file}" ]; then
     touch ${log_tmp_file}
 fi
-if [ ! -f ./tools/logrotate.conf ]; then
-    cp ./tools/logrotate.template ./tools/logrotate.conf
+if [ ! -f ${base_path}/tools/logrotate.conf ]; then
+    cp ${base_path}/tools/logrotate.template ${base_path}/tools/logrotate.conf
 fi
+
+
+### noch offen
+# tree muss installiert sein openssl curl
 
 ########################
 # Functions
@@ -19,17 +26,16 @@ logLast() {
 
 runLogRotate() {
     # check correct path of log files
-    cur_backup_log_path=`cat ./tools/logrotate.conf | grep 'backup\.log'`
+    cur_backup_log_path=`cat ${base_path}/tools/logrotate.conf | grep 'backup\.log'`
     if [[ -z ${cur_backup_log_path} || ! -f ${cur_backup_log_path} ]]; then
-        base_path=`dirname $(readlink -f $0)`
         base_path_backup_log=${base_path}"/logs/backup.log"
         base_path_snapshots_log=${base_path}"/logs/snapshots.log"
-        sed -i "s|.*backup\.log.*|${base_path_backup_log}|" ./tools/logrotate.conf
-        sed -i "s|.*snapshots\.log.*|${base_path_snapshots_log}|" ./tools/logrotate.conf
+        sed -i "s|.*backup\.log.*|${base_path_backup_log}|" ${base_path}/tools/logrotate.conf
+        sed -i "s|.*snapshots\.log.*|${base_path_snapshots_log}|" ${base_path}/tools/logrotate.conf
         logLast "log file paths in logrotate.conf were updated."
     fi
     # force logrotate if not empty
-    logrotate -f ./tools/logrotate.conf
+    logrotate -f ${base_path}/tools/logrotate.conf
 }
 
 logStart() {
@@ -53,18 +59,18 @@ checkResticInstalled() {
 sourceConfigOrCreateIfMissing() {
     local suffix=${1:-}
     # one parameter expected: the name of the config file for the backup target.
-    if [[ $# -eq 1 && ! -f ./$1 ]]; then
-        logLast "$0: target file ./$1 not found."
+    if [[ $# -eq 1 && ! -f ${base_path}/$1 ]]; then
+        logLast "$0: target file ${base_path}/$1 not found."
         read -p "Should I create a target file with that name? [y/N]" create_config
         create_config=${create_config:-N}
         if [ ${create_config} == "y" ]; then
-            chmod +x ./tools/create_target.sh
-            ./tools/create_target.sh > ./$1
+            chmod +x ${base_path}/tools/create_target.sh
+            ${base_path}/tools/create_target.sh > ${base_path}/$1
             logLast "Target file created. Please change it the parameters to your needs." 
         fi
         exit 1
     else
-        source ./$1
+        source ${base_path}/$1
     fi
 
     if [[ -z ${RESTIC_BACKUP_DIR} || -z ${RESTIC_PASSWORD} ]]; then
@@ -101,30 +107,31 @@ resticSelfUpdate() {
 
 getSnapshotsOrInit() {
     local step=${1:-}
-    echo -e "\n\Snapshots ${step} backup: " >> ./logs/snapshots.log
-    restic snapshots 2>&1 | tee ./logs/snapshots.log
+    echo -e "\n\Snapshots ${step} backup: " >> ${base_path}/logs/snapshots.log
+    restic snapshots 2>&1 | tee ${base_path}/logs/snapshots.log
     status=$?
-    logLast "Check Repo status returned: $status"
+    if [ $status -eq 0 ]; then
+        logLast "Current repository status: good"
     if [ $status != 0 ]; then
-        logLast "Repository '${RESTIC_REPOSITORY}' is faulty or does not exist."
+        logLast "Current repository '${RESTIC_REPOSITORY}' is faulty or does not exist."
         read -p "Should I try to initialize the repo with 'restic init'? [y/N]" create_init
         create_init=${create_init:-N}
         if [ ${create_init} == "y" ]; then
             logLast "Try restic init..."
             restic init
         else
-            logLast "No restic init..."
+            logLast "exit now."
         fi
-        healthcheck /fail
+        healthcheck
         exit 1
     fi
 }
 
 runHook() {
     local hook_file=${1:-}
-    if [ -f "./hooks/${hook_file}" ]; then
+    if [ -f "${base_path}/hooks/${hook_file}" ]; then
         logLast "Running ${hook_file}."
-        ./hooks/${hook_file} 2>&1 | tee -a "$log_tmp_file"
+        ${base_path}/hooks/${hook_file} 2>&1 | tee -a "$log_tmp_file"
     else
         logLast "No ${hook_file} found. Skipping."
     fi
