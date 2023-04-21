@@ -108,7 +108,7 @@ resticSelfUpdate() {
 getSnapshotsOrInit() {
     local step=${1:-}
     echo -e "\n\Snapshots ${step} backup: " >> ${base_path}/logs/snapshots.log
-    restic snapshots 2>&1 | tee ${base_path}/logs/snapshots.log
+    restic snapshots 2>&1 | tee -a ${base_path}/logs/snapshots.log
     status=$?
     if [ $status -eq 0 ]; then
         logLast "Current repository status: good"
