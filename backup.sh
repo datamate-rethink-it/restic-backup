@@ -1,6 +1,9 @@
 #!/bin/bash
 set -uo pipefail
 log_tmp_file=./logs/backup.log
+if [ ! -f "${log_tmp_file}" ]; then
+    touch ${log_tmp_file}
+fi
 
 ########################
 # Functions
@@ -11,7 +14,7 @@ logLast() {
 }
 
 logStart() {
-    logLast ">>>>>>>>>>\n>>>>>>>>>> \nBACKUP STARTED: at $(date +"%Y-%m-%d %H:%M:%S")"
+    logLast ">>>>>>>>>> BACKUP STARTED: at $(date +"%Y-%m-%d %H:%M:%S") <<<<<<<<<<"
 }
 
 checkResticInstalled() {
@@ -29,18 +32,16 @@ checkResticInstalled() {
 }
 
 sourceConfigOrCreateIfMissing() {
+    local suffix=${1:-}
     # one parameter expected: the name of the config file for the backup target.
-    if [ $# -ne 1 ]; then
-        logLast "$0: Wrong input. Please pass the name of the target file as one and only parameter."
-        exit 1
-    elif [[ $# -eq 1 && ! -f ./$1 ]]; then
+    if [[ $# -eq 1 && ! -f ./$1 ]]; then
         logLast "$0: target file ./$1 not found."
         read -p "Should I create a target file with that name? [y/N]" create_config
         create_config=${create_config:-N}
         if [ ${create_config} == "y" ]; then
             chmod +x ./tools/create_target.sh
             ./tools/create_target.sh > ./$1
-            logLast "Target file created." 
+            logLast "Target file created. Please change it the parameters to your needs." 
         fi
         exit 1
     else
@@ -54,7 +55,18 @@ sourceConfigOrCreateIfMissing() {
 }
 
 runLogRotate() {
-    logrotate ./tools/logrotate.conf
+    # check correct path of log files
+    cur_backup_log_path=`cat ../tools/logrotate.conf | grep 'backup\.log'`
+    if [ ! -f ${cur_backup_log_path} ]; then
+        base_path=`dirname $(readlink -f $0)`
+        base_path_backup_log=${base_path}"/backup.log"
+        base_path_snapshots_log=${base_path}"/snapshots.log"
+        sed -i 's/.*backup\.log.*/${base_path_backup_log}/' ./tools/logrotate.conf
+        sed -i 's/.*snapshots\.log.*/${base_path_snapshots_log}/' ./tools/logrotate.conf
+    fi
+
+    # force logrotate if not empty
+    logrotate -f ./tools/logrotate.conf
 }
 
 healthcheck() {
@@ -133,6 +145,8 @@ runBackup() {
     else
         logLast "Backup Failed with Status ${rc_backup}"
         restic unlock
+        healthcheck /fail
+        exit 1
     fi
 }
 
@@ -163,9 +177,14 @@ logFinishTime() {
 # Let's backup
 ########################
 
+if [ $# -ne 1 ]; then
+    echo "$0: Wrong input. Please pass the name of the target file as one and only parameter."
+    exit 1
+fi
+
 logStart
 checkResticInstalled
-sourceConfigOrCreateIfMissing
+sourceConfigOrCreateIfMissing $1
 runLogRotate
 healthcheck /start
 resticSelfUpdate
