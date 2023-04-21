@@ -112,6 +112,7 @@ getSnapshotsOrInit() {
     status=$?
     if [ $status -eq 0 ]; then
         logLast "Current repository status: good"
+    fi
     if [ $status != 0 ]; then
         logLast "Current repository '${RESTIC_REPOSITORY}' is faulty or does not exist."
         read -p "Should I try to initialize the repo with 'restic init'? [y/N]" create_init
@@ -140,6 +141,7 @@ runHook() {
 runBackup() {
     start=$(date +'%s')
     logLast "Start Backup at $(date +"%Y-%m-%d %H:%M:%S")"
+    logLast "RESTIC_BACKUP_DIR: ${RESTIC_BACKUP_DIR:-}"
     logLast "RESTIC_REPOSITORY: ${RESTIC_REPOSITORY:-}"
     logLast "RESTIC_JOB_ARGS: ${RESTIC_JOB_ARGS:-}"
     logLast "RESTIC_FORGET_ARGS: ${RESTIC_FORGET_ARGS:-}"
