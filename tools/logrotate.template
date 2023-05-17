@@ -6,7 +6,6 @@
     copytruncate
     missingok
     notifempty
-    daily
     compress
     delaycompress
 }

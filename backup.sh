@@ -12,10 +12,6 @@ if [ ! -f ${base_path}/tools/logrotate.conf ]; then
     cp ${base_path}/tools/logrotate.template ${base_path}/tools/logrotate.conf
 fi
 
-
-### noch offen
-# tree muss installiert sein openssl curl
-
 ########################
 # Functions
 ########################
@@ -42,7 +38,18 @@ logStart() {
     logLast ">>>>>>>>>> BACKUP STARTED: at $(date +"%Y-%m-%d %H:%M:%S") <<<<<<<<<<"
 }
 
-checkResticInstalled() {
+checkPrerequisites() {
+    # other requirements
+    if ! command -v tree &> /dev/null; then
+        apt -y install tree
+    fi
+    if ! command -v openssl &> /dev/null; then
+        apt -y install openssl
+    fi
+    if ! command -v curl &> /dev/null; then
+        apt -y install curl
+    fi
+    
     # restic is a requirement. Install if missing.
     if ! command -v restic &> /dev/null; then
         logLast "restic is not installed."
@@ -53,7 +60,7 @@ checkResticInstalled() {
             logLast "Try to re-run this script"
         fi
         exit 1
-    fi
+    fi    
 }
 
 sourceConfigOrCreateIfMissing() {
@@ -82,10 +89,11 @@ sourceConfigOrCreateIfMissing() {
 healthcheck() {
     local suffix=${1:-}
     if [ -n "$HEALTHCHECK_URL" ]; then
-        echo -n "Reporting healthcheck $suffix ... "
+        echo -n "Reporting healthcheck $suffix ..."
+        [[ ${suffix} == "/start" ]] && m="" || m=$(cat ${base_path}/logs/backup.log | tail --bytes=100000)
         curl -fSsL --retry 3 -X POST \
             --user-agent "docker-restic/0.1.0" \
-            --data-binary "@${log_tmp_file}" "${HEALTHCHECK_URL}${suffix}"
+            --data-raw "$m" "${HEALTHCHECK_URL}${suffix}"
         echo
         if [ $? != 0 ]; then
             logLast "HEALTHCHECK_URL seems to be wrong..."
@@ -129,10 +137,26 @@ getSnapshotsOrInit() {
 }
 
 runHook() {
-    local hook_file=${1:-}
-    if [ -f "${base_path}/hooks/${hook_file}" ]; then
-        logLast "Running ${hook_file}."
-        ${base_path}/hooks/${hook_file} 2>&1 | tee -a "$log_tmp_file"
+    local hook_type=${1:-}
+    if [ ${hook_type} -eq "pre" && -f "${base_path}/${PRE_HOOK}" ]; then
+        hook_file="${base_path}/${PRE_HOOK}"
+    elseif [ ${hook_type} -eq "pre" && -f "${base_path}/${POST_HOOK}" ]; then
+        hook_file="${base_path}/${POST_HOOK}"
+    else
+        hook_file=""
+        logLast "No ${hook_type}-hook found. Skipping."
+    fi
+    
+    if [ ${hook_file} != "" ]; then
+        logLast "Running ${hook_type}: ${hook_file}."
+        chmod +x ${hook_file}
+        ${hook_file} 2>&1 | tee -a "$log_tmp_file"
+        status=$?
+        if [ $status != 0 ]; then
+            logLast "Error at hook-script. Exit now."
+            healthcheck $?
+            exit 1
+        fi
     else
         logLast "No ${hook_file} found. Skipping."
     fi
@@ -147,7 +171,7 @@ runBackup() {
     logLast "RESTIC_FORGET_ARGS: ${RESTIC_FORGET_ARGS:-}"
     logLast ""
     logLast "Directory tree:"
-    tree -dph -L 3 ${RESTIC_BACKUP_DIR} | tee -a "$log_tmp_file"
+    tree -a -P .exclude_from_backup -L 3 ${RESTIC_BACKUP_DIR} | tee -a "$log_tmp_file"
 
     # shellcheck disable=SC2086
     restic backup ${RESTIC_BACKUP_DIR} ${RESTIC_JOB_ARGS} 2>&1 | tee -a "$log_tmp_file"
@@ -197,16 +221,16 @@ fi
 
 runLogRotate
 logStart
-checkResticInstalled
+checkPrerequisites
 sourceConfigOrCreateIfMissing $1
 healthcheck /start
 resticSelfUpdate
 getSnapshotsOrInit before
-runHook pre-backup.sh
+runHook pre
 runBackup
 forgetBackups
 logFinishTime
-runHook post-backup.sh
+runHook post
 getSnapshotsOrInit after
 healthcheck
 

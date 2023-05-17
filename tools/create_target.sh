@@ -11,6 +11,8 @@ export RESTIC_PASSWORD="${PASSWORD}"
 export RESTIC_JOB_ARGS="--exclude-caches --exclude-if-present .exclude_from_backup"
 export RESTIC_FORGET_ARGS="--prune --keep-daily 3 --keep-weekly 3 --keep-monthly 3"
 export HEALTHCHECK_URL=""
+export PRE_HOOK="pre-backup.sh"
+export POST_HOOK=""
 
 ## only required for Backblaze
 export B2_ACCOUNT_ID=""
@@ -23,7 +25,7 @@ export AWS_SECRET_ACCESS_KEY=""
 
 ## Important:
 # 1. without the RESTIC_PASSWORD every backup is useless.
-# 2. preparation tasks like creating a database dump can be done with ./hooks/pre-backup.sh. 
+# 2. preparation tasks like creating a database dump can be done with PRE_HOOK script like ./pre-backup.sh. 
 # 3. To exclude folders and his subfolders, create a file with the name .exclude_from_backup at this folder
 
 ## Examples for RESTIC_REPOSITORY:
@@ -36,5 +38,12 @@ export AWS_SECRET_ACCESS_KEY=""
 #               "requires three additional parameters"
 # [rclone]      "rclone:TARGET:PATH"
 #               "use 'rclone config' to define TARGET first
+
+## Examples for RESTIC_FORGET_ARGS:
+# --prune --keep-daily 3 --keep-weekly 3 --keep-monthly 3
+
+## Examples for cronjob
+# 0 4 * * 1,4 /opt/restic-backup/backup.sh rest-server
+# 0 2 * * * /opt/restic-backup/backup.sh b2
 
 EOF

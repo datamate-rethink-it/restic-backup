@@ -1,2 +1,2 @@
-tools/logrotate.conf
-hooks/pre-backup.sh
+cache/*
+pre-backup.sh
