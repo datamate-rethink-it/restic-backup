@@ -226,7 +226,7 @@ if [ $# -ne 1 ]; then
     exit 1
 fi
 
-runLogRotate
+runLogRotate $1
 logStart
 checkPrerequisites
 sourceConfigOrCreateIfMissing $1
