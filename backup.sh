@@ -6,7 +6,7 @@ set -uo pipefail
 ########################
 
 base_path=`dirname $(readlink -f $0)`
-mkdir ${base_path}/logs/${1}/
+mkdir -p ${base_path}/logs/${1}/
 backup_log=${base_path}/logs/${1}/backup.log
 snapshot_log=${base_path}/logs/${1}/snapshots.log
 logrotate_conf=${base_path}/conf/logrotate-${1}.conf
