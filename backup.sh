@@ -81,7 +81,7 @@ sourceConfigOrCreateIfMissing() {
         fi
         exit 1
     else
-        source ${base_path}/$1
+        source ${base_path}/conf/$1
     fi
 
     if [[ -z ${RESTIC_BACKUP_DIR} || -z ${RESTIC_PASSWORD} ]]; then
@@ -96,7 +96,7 @@ healthcheck() {
         echo -n "Reporting healthcheck $suffix ..."
         [[ ${suffix} == "/start" ]] && m="" || m=$(cat ${base_path}/logs/backup.log | tail --bytes=100000)
         curl -fSsL --retry 3 -X POST \
-            --user-agent "docker-restic/0.1.0" \
+            --user-agent "datamate-restic/1.0.0" \
             --data-raw "$m" "${HEALTHCHECK_URL}${suffix}"
         echo
         if [ $? != 0 ]; then
@@ -119,8 +119,8 @@ resticSelfUpdate() {
 
 getSnapshotsOrInit() {
     local step=${1:-}
-    echo -e "\n\Snapshots ${step} backup: " >> ${base_path}/logs/snapshots.log
-    restic snapshots 2>&1 | tee -a ${base_path}/logs/snapshots.log
+    echo -e "\n\Snapshots ${step} backup (max. 20 lines): " >> ${base_path}/logs/snapshots.log
+    restic snapshots 2>&1 | tail -n 20 | tee -a ${base_path}/logs/snapshots.log
     status=$?
     if [ $status -eq 0 ]; then
         logLast "Current repository status: good"
@@ -142,19 +142,19 @@ getSnapshotsOrInit() {
 
 runHook() {
     local hook_type=${1:-}
-    if [ ${hook_type} -eq "pre" && -f "${base_path}/conf/${PRE_HOOK}" ]; then
-        hook_file="${base_path}/conf/${PRE_HOOK}"
-    elif [ ${hook_type} -eq "pre" && -f "${base_path}/conf/${POST_HOOK}" ]; then
-        hook_file="${base_path}/conf/${POST_HOOK}"
+    if [[ ${hook_type} -eq "pre" && -f "${base_path}/conf/${PRE_HOOK}" ]]; then
+        hook_file="${PRE_HOOK}"
+    elif [[ ${hook_type} -eq "post" && -f "${base_path}/conf/${POST_HOOK}" ]]; then
+        hook_file="${POST_HOOK}"
     else
         hook_file=""
         logLast "No ${hook_type}-hook found. Skipping."
     fi
     
-    if [ ${hook_file} != "" ]; then
+    if [[ ${hook_file} != "" && -f "${base_path}/conf/${hook_file}" ]]; then
         logLast "Running ${hook_type}: ${hook_file}."
-        chmod +x ${hook_file}
-        ${hook_file} 2>&1 | tee -a "$log_tmp_file"
+        chmod +x ${base_path}/conf/${hook_file}
+        ${base_path}/conf/${hook_file} 2>&1 | tee -a "$log_tmp_file"
         status=$?
         if [ $status != 0 ]; then
             logLast "Error at hook-script. Exit now."
@@ -167,6 +167,7 @@ runHook() {
 }
 
 runBackup() {
+    echo ""
     start=$(date +'%s')
     logLast "Start Backup at $(date +"%Y-%m-%d %H:%M:%S")"
     logLast "RESTIC_BACKUP_DIR: ${RESTIC_BACKUP_DIR:-}"
