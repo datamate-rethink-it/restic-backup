@@ -6,14 +6,16 @@ set -uo pipefail
 ########################
 
 base_path=`dirname $(readlink -f $0)`
-log_tmp_file=${base_path}/logs/backup.log
+mkdir ${base_path}/logs/${1}/
+backup_log=${base_path}/logs/${1}/backup.log
+snapshot_log=${base_path}/logs/${1}/snapshots.log
+logrotate_conf=${base_path}/conf/logrotate-${1}.conf
 
-
-if [ ! -f "${log_tmp_file}" ]; then
-    touch ${log_tmp_file}
+if [ ! -f "${backup_log}" ]; then
+    touch ${backup_log}
 fi
-if [ ! -f ${base_path}/conf/logrotate.conf ]; then
-    cp ${base_path}/tools/logrotate.template ${base_path}/conf/logrotate.conf
+if [ ! -f ${logrotate_conf} ]; then
+    cp ${base_path}/tools/logrotate.template ${logrotate_conf}
 fi
 
 ########################
@@ -21,21 +23,19 @@ fi
 ########################
 
 logLast() {
-    echo -e "$1" | tee -a "$log_tmp_file"
+    echo -e "$1" | tee -a "$backup_log"
 }
 
 runLogRotate() {
     # check correct path of log files
-    cur_backup_log_path=`cat ${base_path}/conf/logrotate.conf | grep 'backup\.log'`
+    cur_backup_log_path=`cat ${logrotate_conf} | grep 'backup\.log'`
     if [[ -z ${cur_backup_log_path} || ! -f ${cur_backup_log_path} ]]; then
-        base_path_backup_log=${base_path}"/logs/backup.log"
-        base_path_snapshots_log=${base_path}"/logs/snapshots.log"
-        sed -i "s|.*backup\.log.*|${base_path_backup_log}|" ${base_path}/conf/logrotate.conf
-        sed -i "s|.*snapshots\.log.*|${base_path_snapshots_log}|" ${base_path}/conf/logrotate.conf
-        logLast "log file paths in logrotate.conf were updated."
+        sed -i "s|.*backup\.log.*|${backup_log}|" ${logrotate_conf}
+        sed -i "s|.*snapshots\.log.*|${snapshot_log}|" ${logrotate_conf}
+        logLast "log file paths in logrotate-${1}.conf were updated."
     fi
     # force logrotate if not empty
-    logrotate -f ${base_path}/conf/logrotate.conf
+    logrotate -f ${logrotate_conf}
 }
 
 logStart() {
@@ -94,7 +94,7 @@ healthcheck() {
     local suffix=${1:-}
     if [ -n "$HEALTHCHECK_URL" ]; then
         echo -n "Reporting healthcheck $suffix ..."
-        [[ ${suffix} == "/start" ]] && m="" || m=$(cat ${base_path}/logs/backup.log | tail --bytes=100000)
+        [[ ${suffix} == "/start" ]] && m="" || m=$(cat ${backup_log} | tail --bytes=100000)
         curl -fSsL --retry 3 -X POST \
             --user-agent "datamate-restic/1.0.0" \
             --data-raw "$m" "${HEALTHCHECK_URL}${suffix}"
@@ -119,8 +119,8 @@ resticSelfUpdate() {
 
 getSnapshotsOrInit() {
     local step=${1:-}
-    echo -e "\n\Snapshots ${step} backup (max. 20 lines): " >> ${base_path}/logs/snapshots.log
-    restic snapshots 2>&1 | tail -n 20 | tee -a ${base_path}/logs/snapshots.log
+    echo -e "\n\Snapshots ${step} backup (max. 20 lines): " >> ${snapshot_log}
+    restic snapshots 2>&1 | tail -n 20 | tee -a ${snapshot_log}
     status=$?
     if [ $status -eq 0 ]; then
         logLast "Current repository status: good"
@@ -154,7 +154,7 @@ runHook() {
     if [[ ${hook_file} != "" && -f "${base_path}/conf/${hook_file}" ]]; then
         logLast "Running ${hook_type}: ${hook_file}."
         chmod +x ${base_path}/conf/${hook_file}
-        ${base_path}/conf/${hook_file} 2>&1 | tee -a "$log_tmp_file"
+        ${base_path}/conf/${hook_file} 2>&1 | tee -a "$backup_log"
         status=$?
         if [[ $status == 0 ]]; then
             logLast "Hook successful"
@@ -180,10 +180,10 @@ runBackup() {
     logLast "POST_HOOK: ${POST_HOOK:-}"
     logLast ""
     logLast "Directory tree:"
-    tree -a -P .exclude_from_backup -L 3 ${RESTIC_BACKUP_DIR} | tee -a "$log_tmp_file"
+    tree -a -P .exclude_from_backup -L 3 ${RESTIC_BACKUP_DIR} | tee -a "$backup_log"
 
     # shellcheck disable=SC2086
-    restic backup ${RESTIC_BACKUP_DIR} ${RESTIC_JOB_ARGS} 2>&1 | tee -a "$log_tmp_file"
+    restic backup ${RESTIC_BACKUP_DIR} ${RESTIC_JOB_ARGS} 2>&1 | tee -a "$backup_log"
     rc_backup=$?
     logLast "Finished backup at $(date +"%Y-%m-%d %H:%M:%S")"
     if [[ $rc_backup == 0 ]]; then
@@ -200,7 +200,7 @@ forgetBackups() {
     if [ -n "${RESTIC_FORGET_ARGS:-}" ]; then
         logLast "Forgetting old snapshots based on RESTIC_FORGET_ARGS = ${RESTIC_FORGET_ARGS}"
         # shellcheck disable=SC2086
-        restic forget ${RESTIC_FORGET_ARGS} 2>&1 | tee -a "$log_tmp_file"
+        restic forget ${RESTIC_FORGET_ARGS} 2>&1 | tee -a "$backup_log"
         rc_forget=$?
         logLast "Finished forget at $(date)"
         if [[ $rc_forget == 0 ]]; then
