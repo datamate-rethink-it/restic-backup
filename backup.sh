@@ -142,9 +142,9 @@ getSnapshotsOrInit() {
 
 runHook() {
     local hook_type=${1:-}
-    if [[ ${hook_type} -eq "pre" && -f "${base_path}/conf/${PRE_HOOK}" ]]; then
+    if [[ ${hook_type} == "pre" && -f "${base_path}/conf/${PRE_HOOK}" ]]; then
         hook_file="${PRE_HOOK}"
-    elif [[ ${hook_type} -eq "post" && -f "${base_path}/conf/${POST_HOOK}" ]]; then
+    elif [[ ${hook_type} == "post" && -f "${base_path}/conf/${POST_HOOK}" ]]; then
         hook_file="${POST_HOOK}"
     else
         hook_file=""
@@ -156,7 +156,9 @@ runHook() {
         chmod +x ${base_path}/conf/${hook_file}
         ${base_path}/conf/${hook_file} 2>&1 | tee -a "$log_tmp_file"
         status=$?
-        if [ $status != 0 ]; then
+        if [[ $status == 0 ]]; then
+            logLast "Hook successful"
+        else
             logLast "Error at hook-script. Exit now."
             healthcheck $?
             exit 1
