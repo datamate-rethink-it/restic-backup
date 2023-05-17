@@ -163,8 +163,6 @@ runHook() {
             healthcheck $?
             exit 1
         fi
-    else
-        logLast "No ${hook_file} found. Skipping."
     fi
 }
 

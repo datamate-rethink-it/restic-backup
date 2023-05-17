@@ -1,3 +1,4 @@
 cache/*
 conf/*
 logs/*
+!/**/.gitkeep
