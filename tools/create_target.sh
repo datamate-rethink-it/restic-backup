@@ -6,7 +6,7 @@ cat <<EOF
 # Configure your restic backup target
 
 export RESTIC_BACKUP_DIR="/opt"
-export RESTIC_REPOSITORY="/target-file"
+export RESTIC_REPOSITORY=""
 export RESTIC_PASSWORD="${PASSWORD}"
 export RESTIC_JOB_ARGS="--exclude-caches --exclude-if-present .exclude_from_backup"
 export RESTIC_FORGET_ARGS="--prune --keep-daily 3 --keep-weekly 3 --keep-monthly 3"
@@ -25,7 +25,7 @@ export AWS_SECRET_ACCESS_KEY=""
 
 ## Important:
 # 1. without the RESTIC_PASSWORD every backup is useless.
-# 2. preparation tasks like creating a database dump can be done with PRE_HOOK script like ./pre-backup.sh. 
+# 2. preparation tasks like creating a database dump can be done with PRE_HOOK script ./pre-backup.sh.
 # 3. To exclude folders and his subfolders, create a file with the name .exclude_from_backup at this folder
 
 ## Examples for RESTIC_REPOSITORY:

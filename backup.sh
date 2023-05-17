@@ -1,6 +1,10 @@
 #!/bin/bash
 set -uo pipefail
 
+########################
+# Attention: don't modify this file. Only files in the conf folder should be changed...
+########################
+
 base_path=`dirname $(readlink -f $0)`
 log_tmp_file=${base_path}/logs/backup.log
 
@@ -8,8 +12,8 @@ log_tmp_file=${base_path}/logs/backup.log
 if [ ! -f "${log_tmp_file}" ]; then
     touch ${log_tmp_file}
 fi
-if [ ! -f ${base_path}/tools/logrotate.conf ]; then
-    cp ${base_path}/tools/logrotate.template ${base_path}/tools/logrotate.conf
+if [ ! -f ${base_path}/conf/logrotate.conf ]; then
+    cp ${base_path}/tools/logrotate.template ${base_path}/conf/logrotate.conf
 fi
 
 ########################
@@ -22,16 +26,16 @@ logLast() {
 
 runLogRotate() {
     # check correct path of log files
-    cur_backup_log_path=`cat ${base_path}/tools/logrotate.conf | grep 'backup\.log'`
+    cur_backup_log_path=`cat ${base_path}/conf/logrotate.conf | grep 'backup\.log'`
     if [[ -z ${cur_backup_log_path} || ! -f ${cur_backup_log_path} ]]; then
         base_path_backup_log=${base_path}"/logs/backup.log"
         base_path_snapshots_log=${base_path}"/logs/snapshots.log"
-        sed -i "s|.*backup\.log.*|${base_path_backup_log}|" ${base_path}/tools/logrotate.conf
-        sed -i "s|.*snapshots\.log.*|${base_path_snapshots_log}|" ${base_path}/tools/logrotate.conf
+        sed -i "s|.*backup\.log.*|${base_path_backup_log}|" ${base_path}/conf/logrotate.conf
+        sed -i "s|.*snapshots\.log.*|${base_path_snapshots_log}|" ${base_path}/conf/logrotate.conf
         logLast "log file paths in logrotate.conf were updated."
     fi
     # force logrotate if not empty
-    logrotate -f ${base_path}/tools/logrotate.conf
+    logrotate -f ${base_path}/conf/logrotate.conf
 }
 
 logStart() {
@@ -66,14 +70,14 @@ checkPrerequisites() {
 sourceConfigOrCreateIfMissing() {
     local suffix=${1:-}
     # one parameter expected: the name of the config file for the backup target.
-    if [[ $# -eq 1 && ! -f ${base_path}/$1 ]]; then
-        logLast "$0: target file ${base_path}/$1 not found."
+    if [[ $# -eq 1 && ! -f ${base_path}/conf/$1 ]]; then
+        logLast "$0: target file ${base_path}/conf/$1 not found."
         read -p "Should I create a target file with that name? [y/N]" create_config
         create_config=${create_config:-N}
         if [ ${create_config} == "y" ]; then
             chmod +x ${base_path}/tools/create_target.sh
-            ${base_path}/tools/create_target.sh > ${base_path}/$1
-            logLast "Target file created. Please change it the parameters to your needs." 
+            ${base_path}/tools/create_target.sh > ${base_path}/conf/$1
+            logLast "Target file created. Please change the parameters to your needs." 
         fi
         exit 1
     else
@@ -138,10 +142,10 @@ getSnapshotsOrInit() {
 
 runHook() {
     local hook_type=${1:-}
-    if [ ${hook_type} -eq "pre" && -f "${base_path}/${PRE_HOOK}" ]; then
-        hook_file="${base_path}/${PRE_HOOK}"
-    elseif [ ${hook_type} -eq "pre" && -f "${base_path}/${POST_HOOK}" ]; then
-        hook_file="${base_path}/${POST_HOOK}"
+    if [ ${hook_type} -eq "pre" && -f "${base_path}/conf/${PRE_HOOK}" ]; then
+        hook_file="${base_path}/conf/${PRE_HOOK}"
+    elif [ ${hook_type} -eq "pre" && -f "${base_path}/conf/${POST_HOOK}" ]; then
+        hook_file="${base_path}/conf/${POST_HOOK}"
     else
         hook_file=""
         logLast "No ${hook_type}-hook found. Skipping."
@@ -169,6 +173,8 @@ runBackup() {
     logLast "RESTIC_REPOSITORY: ${RESTIC_REPOSITORY:-}"
     logLast "RESTIC_JOB_ARGS: ${RESTIC_JOB_ARGS:-}"
     logLast "RESTIC_FORGET_ARGS: ${RESTIC_FORGET_ARGS:-}"
+    logLast "PRE_HOOK: ${PRE_HOOK:-}"
+    logLast "POST_HOOK: ${POST_HOOK:-}"
     logLast ""
     logLast "Directory tree:"
     tree -a -P .exclude_from_backup -L 3 ${RESTIC_BACKUP_DIR} | tee -a "$log_tmp_file"

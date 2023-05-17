@@ -1,2 +1,3 @@
 cache/*
-pre-backup.sh
+conf/*
+logs/*
