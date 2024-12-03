@@ -1,3 +1,6 @@
+> [!IMPORTANT]
+> This is deprecated. We use this [Restic Docker Container](https://github.com/seatable/restic-backup-docker) instead.
+
 # Restic Backup Script
 
 This script creates backups using restic
@@ -25,9 +28,7 @@ Beide ordner müssen existieren. der erste wird in den zweiten gemountet.
 
 ## backup different stuff
 
-1. rsync config files 
+1. rsync config files
 2. mount bind
 3. dump from local database
 4. dump from docker container
-
-
